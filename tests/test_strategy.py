@@ -95,7 +95,7 @@ def test_single_sided_open_is_allowed(strategy: LPFullRangeCurve2crvStrategy):
 
 
 def test_hold_when_total_balance_below_min_deploy(strategy: LPFullRangeCurve2crvStrategy):
-    market = _mock_market(usdc_balance="1", usdc_usd="5", usdt_balance="1", usdt_usd="5")
+    market = _mock_market(usdc_balance="1", usdc_usd="2", usdt_balance="1", usdt_usd="2")
     intent = strategy.decide(market)
 
     assert intent.intent_type.value == "HOLD"
@@ -145,6 +145,16 @@ def test_hold_when_slippage_unavailable_and_fail_closed(strategy: LPFullRangeCur
     intent = strategy.decide(market)
 
     assert intent.intent_type.value == "HOLD"
+    assert "Deposit slippage unavailable" in intent.reason
+
+
+def test_hold_reason_includes_deposit_slippage_value(strategy: LPFullRangeCurve2crvStrategy):
+    market = _mock_market(slippage_pct="0.02")
+    intent = strategy.decide(market)
+
+    assert intent.intent_type.value == "HOLD"
+    assert "Deposit slippage" in intent.reason
+    assert "max" in intent.reason
 
 
 def test_force_open_returns_lp_open(strategy: LPFullRangeCurve2crvStrategy):

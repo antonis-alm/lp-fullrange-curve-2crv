@@ -110,8 +110,9 @@ class LPFullRangeCurve2crvStrategy(IntentStrategy):
                 self._last_exit_reason = "depeg"
                 return self._build_lp_close_intent()
 
-            if self.exit_on_withdraw_impossible_or_unsafe and not self._slippage_gate_ok(market):
-                self._last_exit_reason = "unsafe_withdrawal"
+            slippage_ok, slippage_reason = self._evaluate_slippage_gate(market)
+            if self.exit_on_withdraw_impossible_or_unsafe and not slippage_ok:
+                self._last_exit_reason = f"unsafe_withdrawal: {slippage_reason}"
                 return self._build_lp_close_intent()
 
             if self.claim_enabled and self.claim_threshold_usd > Decimal("0"):
@@ -119,17 +120,19 @@ class LPFullRangeCurve2crvStrategy(IntentStrategy):
 
             return Intent.hold(reason="Passive LP active")
 
+        slippage_ok, slippage_reason = self._evaluate_slippage_gate(market)
+
         if self._awaiting_reentry_after_exit and not self.reopen_after_exit:
             if not both_in_band:
                 return Intent.hold(reason="Waiting re-entry: stables not back in peg band")
-            if self.require_slippage_for_reentry and not self._slippage_gate_ok(market):
-                return Intent.hold(reason="Waiting re-entry: slippage unacceptable")
+            if self.require_slippage_for_reentry and not slippage_ok:
+                return Intent.hold(reason=f"Waiting re-entry: {slippage_reason}")
 
         if not both_in_band:
             return Intent.hold(reason="No LP position: peg outside safe band")
 
-        if self.require_slippage_for_reentry and not self._slippage_gate_ok(market):
-            return Intent.hold(reason="Deposit slippage unacceptable")
+        if self.require_slippage_for_reentry and not slippage_ok:
+            return Intent.hold(reason=slippage_reason)
 
         try:
             bal_0 = market.balance(self.asset_0, price=price_0)
@@ -198,7 +201,8 @@ class LPFullRangeCurve2crvStrategy(IntentStrategy):
             return False
         return (now - self._last_action_ts).total_seconds() < self.action_cooldown_seconds
 
-    def _slippage_gate_ok(self, market: MarketSnapshot) -> bool:
+    def _evaluate_slippage_gate(self, market: MarketSnapshot) -> tuple[bool, str]:
+        max_slip_pct = self.max_slippage_pct * Decimal("100")
         try:
             envelope = market.estimate_slippage(
                 token_in=self.asset_0,
@@ -208,15 +212,24 @@ class LPFullRangeCurve2crvStrategy(IntentStrategy):
                 protocol=self.protocol,
             )
         except SlippageEstimateUnavailableError:
-            return not self.fail_closed_on_slippage_unavailable
+            if self.fail_closed_on_slippage_unavailable:
+                return False, "Deposit slippage unavailable (fail-closed)"
+            return True, "Deposit slippage unavailable (fail-open)"
         except (MarketSnapshotError, ValueError):
-            return not self.fail_closed_on_slippage_unavailable
+            if self.fail_closed_on_slippage_unavailable:
+                return False, "Deposit slippage unavailable (fail-closed)"
+            return True, "Deposit slippage unavailable (fail-open)"
 
         estimate = getattr(envelope, "data", envelope)
         slip = self._extract_slippage_pct(estimate)
         if slip is None:
-            return not self.fail_closed_on_slippage_unavailable
-        return slip <= self.max_slippage_pct
+            if self.fail_closed_on_slippage_unavailable:
+                return False, "Deposit slippage unavailable (fail-closed)"
+            return True, "Deposit slippage unavailable (fail-open)"
+
+        slip_pct = slip * Decimal("100")
+        reason = f"Deposit slippage {slip_pct:.3f}% (max {max_slip_pct:.3f}%)"
+        return slip <= self.max_slippage_pct, reason
 
     def _extract_slippage_pct(self, estimate: Any) -> Decimal | None:
         for attr in ("slippage_pct", "price_impact_pct"):
