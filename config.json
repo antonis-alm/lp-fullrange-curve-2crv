@@ -1,0 +1,48 @@
+{
+  "chain": "arbitrum",
+  "protocol": "curve",
+  "pool": "2pool",
+  "lp_token_address": "0x7f90122bf0700f9e7e1f688fe926940e8839f353",
+  "asset_0": "USDC.e",
+  "asset_1": "USDT",
+  "display_assets": [
+    "USDC",
+    "USDT"
+  ],
+  "deploy_fraction_of_available": "0.995",
+  "min_deploy_usd": "5",
+  "action_cooldown_seconds": 3600,
+  "peg_band_lower": "0.995",
+  "peg_band_upper": "1.005",
+  "exit_on_material_depeg": true,
+  "exit_on_withdraw_impossible_or_unsafe": true,
+  "reopen_after_exit": false,
+  "require_slippage_for_reentry": true,
+  "max_slippage_pct": "0.003",
+  "slippage_probe_amount": "5",
+  "fail_closed_on_slippage_unavailable": true,
+  "claim_enabled": true,
+  "claim_threshold_usd": "5",
+  "auto_sell_claimed_rewards": false,
+  "auto_compound_claimed_rewards": false,
+  "force_action": "",
+  "token_funding": [
+    {
+      "symbol": "USDC.e",
+      "address": "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
+      "amount": "5",
+      "amount_type": "usd"
+    },
+    {
+      "symbol": "USDT",
+      "address": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+      "amount": "5",
+      "amount_type": "usd"
+    }
+  ],
+  "anvil_funding": {
+    "ETH": 3,
+    "USDC.e": 100000,
+    "USDT": 100000
+  }
+}
